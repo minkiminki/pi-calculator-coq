@@ -71,13 +71,24 @@ Proof.
 Qed.
 
 
-Definition PI_tg_left (n: nat) :=
+Definition PI_tg_left' (n: nat) :=
   ((/ INR (2 * (2 * n) + 1)) - (/ INR (2 * (2 * n + 1) + 1))).
+
+Definition PI_tg_left (n: nat) :=
+  ((1 / INR (2 * (2 * n) + 1)) - (1 / INR (2 * (2 * n + 1) + 1))).
+
+Lemma PI_tg_left_eq n
+  :
+    PI_tg_left n = PI_tg_left' n.
+Proof.
+  unfold PI_tg_left', PI_tg_left. lra.
+Qed.
 
 Lemma PI_tg_left_pos n
   :
     PI_tg_left n >= 0.
 Proof.
+  rewrite PI_tg_left_eq.
   unfold PI_tg_left. apply Rge_minus.
   apply Rle_ge. apply Rinv_le_contravar.
   { eapply Rlt_le_trans with (r2 := INR 1).
@@ -112,7 +123,7 @@ Proof.
   unfold PI_left_n in *. simpl. rewrite IHn.
   replace (n + S (n + 0) + 1)%nat with (S (2 * n + 1))%nat; [|lia]. simpl.
   rewrite Rplus_assoc. f_equal.
-  unfold PI_tg_left. unfold tg_alt, PI_tg.
+  rewrite PI_tg_left_eq. unfold PI_tg_left', tg_alt, PI_tg.
   replace ((-1) ^ S (n + (n + 0) + 1)) with 1; cycle 1.
   { replace (S (n + (n + 0) + 1))%nat with (2 * (n + 1))%nat; [|lia]. simpl.
     symmetry. apply pow_1_even. }
@@ -124,7 +135,7 @@ Proof.
   { f_equal. f_equal. lia. }
 Qed.
 
-Lemma PI_le_PI_left_n n
+Theorem PI_left_bound n
   :
     4 * (PI_left_n n) <= PI.
 Proof.
@@ -166,8 +177,19 @@ Proof.
 Qed.
 
 
-Definition PI_tg_right (n: nat) :=
+
+Definition PI_tg_right' (n: nat) :=
   (- (/ INR (2 * (2 * n + 1) + 1)) + (/ INR (2 * (2 * n + 2) + 1))).
+
+Definition PI_tg_right (n: nat) :=
+  ((1 / INR (2 * (2 * n + 2) + 1)) - (/ INR (2 * (2 * n + 1) + 1))).
+
+Lemma PI_tg_right_eq n
+  :
+    PI_tg_right n = PI_tg_right' n.
+Proof.
+  unfold PI_tg_right', PI_tg_right. lra.
+Qed.
 
 Lemma PI_tg_right_neg n
   :
@@ -209,7 +231,7 @@ Proof.
   rewrite <- Rplus_assoc. rewrite IHn.
   replace (n + S (n + 0) + 2)%nat with (S (2 * n + 2))%nat; [|lia]. simpl.
   rewrite Rplus_assoc. f_equal.
-  unfold PI_tg_right. unfold tg_alt, PI_tg. f_equal.
+  rewrite PI_tg_right_eq. unfold PI_tg_right', tg_alt, PI_tg. f_equal.
   { replace (n + (n + 0) + 2)%nat with (2 * (n + 1))%nat; [|lia].
     rewrite pow_1_odd.
     replace (2 * (2 * S n + 1) + 1)%nat with (2 * S (2 * (n + 1)) + 1)%nat; [|lia].
@@ -220,7 +242,7 @@ Proof.
     lra. }
 Qed.
 
-Lemma PI_ge_PI_right_n n
+Theorem PI_right_bound n
   :
     PI <= 4 * (PI_right_n n).
 Proof.
@@ -267,16 +289,57 @@ Theorem PI_bound (n: nat)
     4 * (PI_left_n n) <= PI /\ PI <= 4 * (PI_right_n n).
 Proof.
   split.
-  - apply PI_le_PI_left_n.
-  - apply PI_ge_PI_right_n.
+  - apply PI_left_bound.
+  - apply PI_right_bound.
 Qed.
 
 
 (* example *)
 Goal (8 / 3) <= PI /\ PI <=  (52 / 15).
 Proof.
-  Local Opaque PI INR.
+  Local Opaque PI.
   generalize (PI_bound 0).
+  unfold PI_left_n, PI_right_n, sum_f_R0, PI_tg_left, PI_tg_right. simpl. lra.
+Qed.
+
+(* example *)
+Goal (304 / 105) <= PI /\ PI <=  (1052 / 315).
+Proof.
+  Local Opaque PI.
+  generalize (PI_bound 1).
   unfold PI_left_n, PI_right_n, sum_f_R0, PI_tg_left, PI_tg_right. simpl.
-  Set Printing All.
+  lra.
+Qed.
+
+(* example *)
+Goal (10312 / 3465) <= PI /\ PI <=  (147916 / 45045).
+Proof.
+  Local Opaque PI.
+  generalize (PI_bound 2).
+  unfold PI_left_n, PI_right_n, sum_f_R0, PI_tg_left, PI_tg_right. simpl.
+  lra.
+Qed.
+
+(* example *)
+Goal (10312 / 3465) <= PI /\ PI <=  (147916 / 45045).
+Proof.
+  Local Opaque PI.
+  generalize (PI_bound 2).
+  unfold PI_left_n, PI_right_n, sum_f_R0, PI_tg_left, PI_tg_right. simpl.
+  lra.
+Qed.
+
+
+
+(* Definition QtoR (p q: nat): R := (INR p / INR q). *)
+
+
+(* Lemma *)
+
+(* Lemma pi_cal *)
+
+
+(* example *)
+Goal PI <= (512321475000 / 162998802113).
+Proof.
 Abort.
