@@ -403,18 +403,36 @@ Fixpoint sum_f_Z0 (f: nat -> Z) (n: nat): Z :=
   | S n' => (sum_f_Z0 f n' + f n)%Z
   end.
 
+
+Fixpoint sum_f_Z0_tail (f: nat -> Z) (n: nat) (sum: Z): Z :=
+  match n with
+  | O => (sum + f O)%Z
+  | S n' =>
+    let fn := f (S n') in
+    let sum' := (sum + fn)%Z in
+    sum_f_Z0_tail f n' sum'
+  end.
+
+Lemma sum_f_Z0_tail_eq f n sum
+  :
+    (sum + sum_f_Z0 f n)%Z = sum_f_Z0_tail f n sum.
+Proof.
+  revert sum. induction n; intros; simpl; auto.
+  rewrite <- IHn. lia.
+Qed.
+
 Definition PI_left_n_approx (m: nat) (n: nat) :=
-  Q.mk m (sum_f_Z0 (PI_tg_left_approx m) n).
+  Q.mk m (sum_f_Z0_tail (PI_tg_left_approx m) n 0).
 
 Lemma PI_left_n_approx_left m n
   :
     PI_left_n_approx m n <= PI_left_n n.
 Proof.
+  unfold PI_left_n_approx, PI_left_n.
+  rewrite <- sum_f_Z0_tail_eq. simpl.
   induction n.
-  { unfold PI_left_n_approx, PI_left_n. simpl.
-    apply PI_tg_left_approx_left. }
-  { unfold PI_left_n_approx, PI_left_n in *. simpl.
-    rewrite <- Q.plus_same_commute. apply Rplus_le_compat; auto.
+  { simpl. apply PI_tg_left_approx_left. }
+  { simpl. rewrite <- Q.plus_same_commute. apply Rplus_le_compat; auto.
     apply PI_tg_left_approx_left. }
 Qed.
 
@@ -431,8 +449,45 @@ Qed.
 Goal 314/100 <= PI.
 Proof.
   Local Opaque PI Rmult Rinv Rplus Rle.
-  generalize (PI_left_approx_bound 1000%nat 1000%nat); intro X.
-  unfold PI_left_n_approx in X. simpl in X.
+  generalize (PI_left_approx_bound 100000%nat 0%nat); intro X.
+  unfold PI_left_n_approx, Z.to_nat, PI_tg_left_approx, Q.approx_left,
+  sum_f_Z0_tail in X.
+  Local Opaque Init.Nat.of_uint. simpl in X.
+  Local Transparent Init.Nat.of_uint.
+
+
+  set (100000 / 3)%Z.
+  Set Printing All.
+
+  simpl in r.
+
+  set ((Z.of_nat
+          (Init.Nat.of_uint
+             (Decimal.D1
+                (Decimal.D0 (Decimal.D0 (Decimal.D0 (Decimal.D0 (Decimal.D0 Decimal.Nil)))))))))%Z.
+
+  simpl in z.
+
+
+
+  Local Opaque
+  Local Opaque Z.add. simpl in X.
+  unfold sum_f_Z0_tail in X.
+
+  cbv in X.
+
+
+  Local Opaque Init.Nat.of_uint.
+  simpl in X.
+
+  cbv in X.
+  Local Opaque Z.add.
+  cbv in X.
+Qed.
+
+  cbv eta in  X.
+  cbv in X.
+  simpl in X.
 
 
 
