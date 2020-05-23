@@ -71,17 +71,96 @@ Proof.
 Qed.
 
 
+Module Q.
+
+  Record t: Set :=
+    mk
+      {
+        divisor: Z;
+        dividend: Z;
+        nzero: (0 < divisor \/ divisor < 0)%Z;
+      }.
+
+  Definition IQR (x: t): R :=
+    IZR (dividend x) / IZR (divisor x).
+
+  Lemma IQR_unfold p q r
+    :
+      IQR (mk p q r) = IZR q / IZR p.
+  Proof. auto. Qed.
+
+  Global Opaque IQR.
+
+  Program Definition plus (x1 x2: t): t :=
+    mk (x1.(divisor) * x2.(divisor))%Z
+       (x1.(divisor) * x2.(dividend) +
+        x2.(divisor) * x1.(dividend))%Z
+       _.
+  Next Obligation.
+  Proof.
+    destruct x1.(nzero), x2.(nzero).
+    - left. apply Z.mul_pos_pos; auto.
+    - right. apply Z.mul_pos_neg; auto.
+    - right. apply Z.mul_neg_pos; auto.
+    - left. apply Z.mul_neg_neg; auto.
+  Qed.
+
+  Program Definition reduce (x: t): t :=
+    let d := Z.gcd x.(divisor) x.(dividend) in
+    mk (Z.div x.(divisor) d)
+       (Z.div x.(dividend) d)
+       _.
+  Next Obligation.
+  Admitted.
+
+  Lemma plus_commute x1 x2
+    :
+      IQR x1 + IQR x2 =
+      IQR (plus x1 x2).
+  Proof.
+  Admitted.
+
+  Lemma reduce_commute x
+    :
+      IQR x =
+      IQR (reduce x).
+  Proof.
+  Admitted.
+
+  Ltac compute_once H :=
+    (try rewrite plus_commute in H;
+     try rewrite reduce_commute in H).
+
+  Ltac compute H :=
+    repeat (compute_once H).
+
+End Q.
+
+
+
 Definition PI_tg_left' (n: nat) :=
   ((/ INR (2 * (2 * n) + 1)) - (/ INR (2 * (2 * n + 1) + 1))).
 
-Definition PI_tg_left (n: nat) :=
-  ((1 / INR (2 * (2 * n) + 1)) - (1 / INR (2 * (2 * n + 1) + 1))).
+Program Definition PI_tg_left (n: nat) :=
+  (Q.IQR (Q.mk (2 * (2 * Z.of_nat n) + 1) 1 _))
+  +
+  (Q.IQR (Q.mk (2 * (2 * Z.of_nat n + 1) + 1) (-1) _))
+.
+Next Obligation.
+Admitted.
+Next Obligation.
+Admitted.
 
 Lemma PI_tg_left_eq n
   :
     PI_tg_left n = PI_tg_left' n.
 Proof.
-  unfold PI_tg_left', PI_tg_left. lra.
+  unfold PI_tg_left', PI_tg_left.
+  repeat rewrite INR_IZR_INZ.
+  repeat rewrite Q.IQR_unfold.
+  rewrite <- Rplus_opp. f_equal.
+  { replace (2 * (2 * Z.of_nat n) + 1)%Z with (Z.of_nat (2 * (2 * n) + 1))%Z; [lra|lia]. }
+  { replace (2 * (2 * Z.of_nat n + 1) + 1)%Z with (Z.of_nat (2 * (2 * n + 1) + 1))%Z; [lra|lia]. }
 Qed.
 
 Lemma PI_tg_left_pos n
@@ -119,7 +198,7 @@ Lemma PI_left_n_odd (n: nat)
     PI_left_n n = sum_f_R0 (tg_alt PI_tg) (2 * n + 1).
 Proof.
   induction n.
-  { simpl. compute. lra. }
+  { unfold PI_left_n. simpl. rewrite PI_tg_left_eq. compute. lra. }
   unfold PI_left_n in *. simpl. rewrite IHn.
   replace (n + S (n + 0) + 1)%nat with (S (2 * n + 1))%nat; [|lia]. simpl.
   rewrite Rplus_assoc. f_equal.
@@ -181,21 +260,32 @@ Qed.
 Definition PI_tg_right' (n: nat) :=
   (- (/ INR (2 * (2 * n + 1) + 1)) + (/ INR (2 * (2 * n + 2) + 1))).
 
-Definition PI_tg_right (n: nat) :=
-  ((1 / INR (2 * (2 * n + 2) + 1)) - (/ INR (2 * (2 * n + 1) + 1))).
+Program Definition PI_tg_right (n: nat) :=
+  (Q.IQR (Q.mk (2 * (2 * Z.of_nat n + 2) + 1) 1 _))
+  +
+  (Q.IQR (Q.mk (2 * (2 * Z.of_nat n + 1) + 1) (-1) _))
+.
+Next Obligation.
+Admitted.
+Next Obligation.
+Admitted.
 
 Lemma PI_tg_right_eq n
   :
     PI_tg_right n = PI_tg_right' n.
 Proof.
-  unfold PI_tg_right', PI_tg_right. lra.
+  unfold PI_tg_right', PI_tg_right.
+  repeat rewrite INR_IZR_INZ.
+  repeat rewrite Q.IQR_unfold. rewrite Rplus_comm. f_equal.
+  { replace (2 * (2 * Z.of_nat n + 1) + 1)%Z with (Z.of_nat (2 * (2 * n + 1) + 1))%Z; [lra|lia]. }
+  { replace (2 * (2 * Z.of_nat n + 2) + 1)%Z with (Z.of_nat (2 * (2 * n + 2) + 1))%Z; [lra|lia]. }
 Qed.
 
 Lemma PI_tg_right_neg n
   :
     PI_tg_right n <= 0.
 Proof.
-  unfold PI_tg_right.
+  rewrite PI_tg_right_eq. unfold PI_tg_right'.
   cut (/ INR (2 * (2 * n + 2) + 1) <= / INR (2 * (2 * n + 1) + 1)); [lra|].
   apply Rinv_le_contravar.
   { eapply Rlt_le_trans with (r2 := INR 1).
@@ -205,8 +295,15 @@ Proof.
   { apply le_INR. lia. }
 Qed.
 
-Definition PI_right_n (n: nat) :=
-  (1 / 1) + sum_f_R0 PI_tg_right n.
+Program Definition PI_right_n (n: nat) :=
+  Q.IQR (Q.mk 1 1 _) + sum_f_R0 PI_tg_right n.
+Next Obligation.
+  left. lia.
+Qed.
+
+Definition PI_right_n' (n: nat) :=
+  1 + sum_f_R0 PI_tg_right n.
+
 
 Lemma PI_right_decr n m
       (LE: (n <= m)%nat)
@@ -226,7 +323,7 @@ Lemma PI_right_n_even (n: nat)
     PI_right_n n = sum_f_R0 (tg_alt PI_tg) (2 * n + 2).
 Proof.
   induction n.
-  { simpl. compute. lra. }
+  { unfold PI_right_n. simpl. rewrite PI_tg_right_eq. compute. lra. }
   unfold PI_right_n in *. simpl.
   rewrite <- Rplus_assoc. rewrite IHn.
   replace (n + S (n + 0) + 2)%nat with (S (2 * n + 2))%nat; [|lia]. simpl.
@@ -297,10 +394,29 @@ Qed.
 (* example *)
 Goal (8 / 3) <= PI /\ PI <=  (52 / 15).
 Proof.
-  Local Opaque PI.
-  generalize (PI_bound 0).
-  unfold PI_left_n, PI_right_n, sum_f_R0, PI_tg_left, PI_tg_right. simpl. lra.
+  Local Opaque PI Rmult Rinv Rplus.
+  generalize (PI_bound 0). intros H.
+  unfold PI_left_n, PI_right_n, sum_f_R0, PI_tg_left, PI_tg_right in H.
+  simpl in H.
+  Q.compute_once H. compute in H.
+  unfold Q.reduce in H. simpl.
+
+  Q.compute H.
+
+
+
+  lra.
 Qed.
+
+
+
+(* (* example *) *)
+(* Goal (8 / 3) <= PI /\ PI <=  (52 / 15). *)
+(* Proof. *)
+(*   Local Opaque PI. *)
+(*   generalize (PI_bound 0). *)
+(*   unfold PI_left_n, PI_right_n, sum_f_R0, PI_tg_left, PI_tg_right. simpl. lra. *)
+(* Qed. *)
 
 (* example *)
 Goal (304 / 105) <= PI /\ PI <=  (1052 / 315).
@@ -330,8 +446,6 @@ Proof.
 Qed.
 
 
-
-(* Definition QtoR (p q: nat): R := (INR p / INR q). *)
 
 
 (* Lemma *)
