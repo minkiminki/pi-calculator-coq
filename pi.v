@@ -70,14 +70,664 @@ Qed.
 
 Module Q.
 
-  (* Definition mk (divisor: nat) (dividend: Z): R := *)
-  (*   IZR dividend / IZR (Z.of_nat (divisor - 1) + 1). *)
+  Definition mk (divisor: nat) (dividend: Z): R :=
+    IZR dividend / IZR (Z.of_nat (divisor - 1) + 1).
 
-  (* Lemma IQR_unfold p q *)
-  (*   : *)
-  (*     mk p q = IZR q / IZR (Z.of_nat (p - 1) + 1). *)
-  (* Proof. auto. Qed. *)
-  (* Global Opaque mk. *)
+  Lemma unfold p q
+    :
+      mk p q = IZR q / IZR (Z.of_nat (p - 1) + 1).
+  Proof. auto. Qed.
+  Global Opaque mk.
+
+  Definition approx_left (p: nat) (q: Z) (n: nat): Z :=
+    (((Z.of_nat (n - 1) + 1) * q) / (Z.of_nat (p - 1) + 1)).
+
+  Definition approx_right (p: nat) (q: Z) (n: nat): Z :=
+    Z.succ (((Z.of_nat (n - 1) + 1) * q) / (Z.of_nat (p - 1) + 1)).
+
+  Lemma IZR_pos n
+    :
+      0 < IZR (Z.of_nat n + 1).
+  Proof.
+    eapply Rlt_le_trans with (r2 := IZR 1); [lra|].
+    apply IZR_le. lia.
+  Qed.
+
+  Lemma approx_left_left p q n
+    :
+      mk n (approx_left p q n) <= mk p q.
+  Proof.
+    set (LT0:= IZR_pos (n - 1)).
+    set (LT1:= IZR_pos (p - 1)).
+    repeat rewrite unfold.
+    apply (Rmult_le_reg_r (IZR (Z.of_nat (n - 1) + 1))); auto.
+    unfold Rdiv at 1. rewrite Rmult_assoc.
+    rewrite Rinv_l; [|lra]. rewrite Rmult_1_r.
+    unfold Rdiv. rewrite Rmult_assoc. rewrite Rmult_comm.
+    apply (Rmult_le_reg_l (IZR (Z.of_nat (p - 1) + 1))); auto.
+    repeat rewrite <- Rmult_assoc.
+    rewrite Rinv_r; [|lra]. rewrite Rmult_1_l.
+    repeat rewrite <- mult_IZR. apply IZR_le.
+    apply Zdiv.Z_mult_div_ge. lia.
+  Qed.
+
+  Lemma approx_right_right p q n
+    :
+      mk p q <= mk n (approx_right p q n).
+  Proof.
+    set (LT0:= IZR_pos (n - 1)).
+    set (LT1:= IZR_pos (p - 1)).
+    repeat rewrite unfold.
+    apply (Rmult_le_reg_r (IZR (Z.of_nat (p - 1) + 1))); auto.
+    unfold Rdiv at 1. rewrite Rmult_assoc.
+    rewrite Rinv_l; [|lra]. rewrite Rmult_1_r.
+    unfold Rdiv. rewrite Rmult_assoc. rewrite Rmult_comm.
+    apply (Rmult_le_reg_l (IZR (Z.of_nat (n - 1) + 1))); auto.
+    repeat rewrite <- Rmult_assoc.
+    rewrite Rinv_r; [|lra]. rewrite Rmult_1_l.
+    repeat rewrite <- mult_IZR. apply IZR_le.
+    apply Z.lt_le_incl. apply Z.mul_succ_div_gt. lia.
+  Qed.
+
+  Lemma plus_same_commute x y n
+    :
+      mk n x + mk n y = mk n (x + y)
+  .
+  Proof.
+    repeat rewrite unfold.
+    rewrite (plus_IZR x y). lra.
+  Qed.
+
+  Ltac plus_once H :=
+    rewrite plus_same_commute in H.
+
+  Ltac compute H :=
+    repeat (plus_once H).
+
+End Q.
+
+
+
+
+Definition PI_tg_left' (n: nat) :=
+  ((/ INR (2 * (2 * n) + 1)) - (/ INR (2 * (2 * n + 1) + 1))).
+
+Definition PI_tg_left (n: nat) :=
+  (Q.mk (2 * (2 * n) + 1) 1)
+  +
+  (Q.mk (2 * (2 * n + 1) + 1) (-1))
+.
+
+Lemma PI_tg_left_eq n
+  :
+    PI_tg_left n = PI_tg_left' n.
+Proof.
+  unfold PI_tg_left', PI_tg_left.
+  repeat rewrite INR_IZR_INZ.
+  repeat rewrite Q.unfold.
+  rewrite <- Rplus_opp. f_equal.
+  { replace (Z.of_nat (2 * (2 * n) + 1 - 1) + 1)%Z with (Z.of_nat (2 * (2 * n) + 1))%Z;
+      [simpl; lra|lia]. }
+  { replace (Z.of_nat (2 * (2 * n + 1) + 1 - 1) + 1)%Z with (Z.of_nat (2 * (2 * n + 1) + 1))%Z;
+      [simpl; lra|lia]. }
+Qed.
+
+Lemma PI_tg_left_pos n
+  :
+    PI_tg_left n >= 0.
+Proof.
+  rewrite PI_tg_left_eq.
+  unfold PI_tg_left. apply Rge_minus.
+  apply Rle_ge. apply Rinv_le_contravar.
+  { eapply Rlt_le_trans with (r2 := INR 1).
+    { simpl. lra. }
+    { apply le_INR. lia. }
+  }
+  { apply le_INR. lia. }
+Qed.
+
+Definition PI_left_n (n: nat) :=
+  sum_f_R0 PI_tg_left n.
+
+Lemma PI_left_incr n m
+      (LE: (n <= m)%nat)
+  :
+    PI_left_n n <= PI_left_n m.
+Proof.
+  induction LE.
+  { lra. }
+  { unfold PI_left_n in *. simpl.
+    eapply Rle_trans with (r2 := sum_f_R0 PI_tg_left m); auto.
+    set (PI_tg_left_pos (S m)). lra.
+  }
+Qed.
+
+Lemma PI_left_n_odd (n: nat)
+  :
+    PI_left_n n = sum_f_R0 (tg_alt PI_tg) (2 * n + 1).
+Proof.
+  induction n.
+  { unfold PI_left_n. simpl. rewrite PI_tg_left_eq. compute. lra. }
+  unfold PI_left_n in *. simpl. rewrite IHn.
+  replace (n + S (n + 0) + 1)%nat with (S (2 * n + 1))%nat; [|lia]. simpl.
+  rewrite Rplus_assoc. f_equal.
+  rewrite PI_tg_left_eq. unfold PI_tg_left', tg_alt, PI_tg.
+  replace ((-1) ^ S (n + (n + 0) + 1)) with 1; cycle 1.
+  { replace (S (n + (n + 0) + 1))%nat with (2 * (n + 1))%nat; [|lia]. simpl.
+    symmetry. apply pow_1_even. }
+  replace ((-1) ^ S (S (n + (n + 0) + 1))) with (- 1); cycle 1.
+  { replace (S (S (n + (n + 0) + 1))) with (S (2 * (n + 1))); [|lia].
+    symmetry. apply pow_1_odd. }
+  rewrite Rmult_1_l. rewrite Rmult_opp_1. rewrite Rplus_opp. f_equal.
+  { f_equal. f_equal. lia. }
+  { f_equal. f_equal. lia. }
+Qed.
+
+Theorem PI_left_bound n
+  :
+    4 * (PI_left_n n) <= PI.
+Proof.
+  rewrite <- Alt_PI_eq. unfold Alt_PI.
+  rewrite (@Rmult_comm 4 (let (a, _) := exist_PI in a)).
+  rewrite (@Rmult_comm 4 (PI_left_n n)).
+  apply Rmult_le_compat_r; [lra|].
+  eapply Un_cv_inf.
+  { apply (proj2_sig exist_PI). }
+  { instantiate (1:=(2 * n + 1)%nat). intros. simpl.
+    assert (((exists m, n <= m /\ n0 = 2 * m + 1) \/
+             (exists m, n <= m /\ n0 = S (2 * m + 1)))%nat).
+    { induction LE.
+      { left. exists n. eauto. }
+      destruct IHLE.
+      { destruct H as [n0 [LE0 IHLE]]. subst. right.
+        exists n0. split; eauto. }
+      { destruct H as [n0 [LE0 IHLE]]. subst. left.
+        exists (S n0). split; eauto. lia. }
+    }
+    clear LE. destruct H as [[m [LE EQ]]|[m [LE EQ]]]; subst.
+    { rewrite <- PI_left_n_odd. apply PI_left_incr; auto. }
+    { simpl. replace (m + (m + 0) + 1)%nat with (2 * m + 1)%nat; [|lia].
+      rewrite <- PI_left_n_odd.
+      eapply Rle_trans with (r2 := PI_left_n m).
+      { apply PI_left_incr; auto. }
+      { assert (0 <= tg_alt PI_tg (S (2 * m + 1))); [|lra].
+        unfold tg_alt. left. eapply Rmult_lt_0_compat.
+        { replace (S (2 * m + 1))%nat with (2 * (m + 1))%nat; [|lia].
+          rewrite pow_1_even. lra. }
+        { unfold PI_tg. apply Rinv_0_lt_compat.
+          eapply Rlt_le_trans with (r2 := INR 1).
+          { simpl. lra. }
+          { apply le_INR. lia. }
+        }
+      }
+    }
+  }
+Qed.
+
+
+Definition PI_tg_right' (n: nat) :=
+  (- (/ INR (2 * (2 * n + 1) + 1)) + (/ INR (2 * (2 * n + 2) + 1))).
+
+Definition PI_tg_right (n: nat) :=
+  (Q.mk (2 * (2 * n + 2) + 1) 1)
+  +
+  (Q.mk (2 * (2 * n + 1) + 1) (-1)).
+
+Lemma PI_tg_right_eq n
+  :
+    PI_tg_right n = PI_tg_right' n.
+Proof.
+  unfold PI_tg_right', PI_tg_right.
+  repeat rewrite INR_IZR_INZ.
+  repeat rewrite Q.unfold. rewrite Rplus_comm. f_equal.
+  { replace (Z.of_nat (2 * (2 * n + 1) + 1 - 1) + 1)%Z with (Z.of_nat (2 * (2 * n + 1) + 1))%Z;
+      [simpl; lra|lia]. }
+  { replace (Z.of_nat (2 * (2 * n + 2) + 1 - 1) + 1)%Z with (Z.of_nat (2 * (2 * n + 2) + 1))%Z;
+      [simpl; lra|lia]. }
+Qed.
+
+Lemma PI_tg_right_neg n
+  :
+    PI_tg_right n <= 0.
+Proof.
+  rewrite PI_tg_right_eq. unfold PI_tg_right'.
+  cut (/ INR (2 * (2 * n + 2) + 1) <= / INR (2 * (2 * n + 1) + 1)); [lra|].
+  apply Rinv_le_contravar.
+  { eapply Rlt_le_trans with (r2 := INR 1).
+    { simpl. lra. }
+    { apply le_INR. lia. }
+  }
+  { apply le_INR. lia. }
+Qed.
+
+Definition PI_right_n (n: nat) :=
+  1 + sum_f_R0 PI_tg_right n.
+
+Lemma PI_right_decr n m
+      (LE: (n <= m)%nat)
+  :
+    PI_right_n n >= PI_right_n m.
+Proof.
+  induction LE.
+  { lra. }
+  { unfold PI_right_n in *. simpl.
+    eapply Rge_trans; [apply IHLE|].
+    set (PI_tg_right_neg (S m)). lra.
+  }
+Qed.
+
+Lemma PI_right_n_even (n: nat)
+  :
+    PI_right_n n = sum_f_R0 (tg_alt PI_tg) (2 * n + 2).
+Proof.
+  induction n.
+  { unfold PI_right_n. simpl. rewrite PI_tg_right_eq. compute. lra. }
+  unfold PI_right_n in *. simpl.
+  rewrite <- Rplus_assoc. rewrite IHn.
+  replace (n + S (n + 0) + 2)%nat with (S (2 * n + 2))%nat; [|lia]. simpl.
+  rewrite Rplus_assoc. f_equal.
+  rewrite PI_tg_right_eq. unfold PI_tg_right', tg_alt, PI_tg. f_equal.
+  { replace (n + (n + 0) + 2)%nat with (2 * (n + 1))%nat; [|lia].
+    rewrite pow_1_odd.
+    replace (2 * (2 * S n + 1) + 1)%nat with (2 * S (2 * (n + 1)) + 1)%nat; [|lia].
+    lra. }
+  { replace (S (S (n + (n + 0) + 2)))%nat with (2 * (n + 2))%nat; [|lia].
+    rewrite pow_1_even.
+    replace (2 * (2 * S n + 2) + 1)%nat with (2 * (2 * (n + 2)) + 1)%nat; [|lia].
+    lra. }
+Qed.
+
+Theorem PI_right_bound n
+  :
+    PI <= 4 * (PI_right_n n).
+Proof.
+  rewrite <- Alt_PI_eq. unfold Alt_PI.
+  rewrite (@Rmult_comm 4 (let (a, _) := exist_PI in a)).
+  simpl.
+  rewrite (@Rmult_comm 4 (PI_right_n n)).
+  apply Rmult_le_compat_r; [lra|].
+  apply Rge_le. eapply Un_cv_sup.
+  { apply (proj2_sig exist_PI). }
+  { instantiate (1:=(2 * n + 2)%nat). intros. simpl.
+    assert (((exists m, n <= m /\ n0 = 2 * m + 2) \/
+             (exists m, n <= m /\ n0 = S (2 * m + 2)))%nat).
+    { induction LE.
+      { left. exists n. eauto. }
+      destruct IHLE.
+      { destruct H as [n0 [LE0 IHLE]]. subst. right.
+        exists n0. split; eauto. }
+      { destruct H as [n0 [LE0 IHLE]]. subst. left.
+        exists (S n0). split; eauto. lia. }
+    }
+    clear LE. destruct H as [[m [LE EQ]]|[m [LE EQ]]]; subst.
+    { rewrite <- PI_right_n_even. apply PI_right_decr; auto. }
+    { simpl. replace (m + (m + 0) + 2)%nat with (2 * m + 2)%nat; [|lia].
+      rewrite <- PI_right_n_even.
+      eapply Rge_trans with (r2 := PI_right_n m).
+      { apply PI_right_decr; auto. }
+      { assert (0 >= tg_alt PI_tg (S (2 * m + 2))); [|lra].
+        unfold tg_alt. left.
+        replace (S (2 * m + 2))%nat with (S (2 * (m + 1)))%nat; [|lia].
+        rewrite pow_1_odd.
+        cut (PI_tg (S (2 * (m + 1))) > 0); [lra|].
+        unfold PI_tg. apply Rinv_0_lt_compat.
+        eapply Rlt_le_trans with (r2 := INR 1).
+        { simpl. lra. }
+        { apply le_INR. lia. }
+      }
+    }
+  }
+Qed.
+
+
+
+
+Definition PI_tg_left_approx (m: nat) (n: nat) :=
+  ((Q.approx_left (2 * (2 * n) + 1) 1 m) +
+   (Q.approx_left (2 * (2 * n + 1) + 1) (-1) m))%Z
+.
+
+Lemma PI_tg_left_approx_left m n
+  :
+    Q.mk m (PI_tg_left_approx m n) <= PI_tg_left n.
+Proof.
+  unfold PI_tg_left_approx, PI_tg_left.
+  rewrite <- Q.plus_same_commute. apply Rplus_le_compat.
+  { apply Q.approx_left_left. }
+  { apply Q.approx_left_left. }
+Qed.
+
+Fixpoint sum_f_Z0 (f: nat -> Z) (n: nat): Z :=
+  match n with
+  | O => f O
+  | S n' => (sum_f_Z0 f n' + f n)%Z
+  end.
+
+Definition PI_left_n_approx (m: nat) (n: nat) :=
+  Q.mk m (sum_f_Z0 (PI_tg_left_approx m) n).
+
+Lemma PI_left_n_approx_left m n
+  :
+    PI_left_n_approx m n <= PI_left_n n.
+Proof.
+  induction n.
+  { unfold PI_left_n_approx, PI_left_n. simpl.
+    apply PI_tg_left_approx_left. }
+  { unfold PI_left_n_approx, PI_left_n in *. simpl.
+    rewrite <- Q.plus_same_commute. apply Rplus_le_compat; auto.
+    apply PI_tg_left_approx_left. }
+Qed.
+
+Theorem PI_left_approx_bound m n
+  :
+    4 * (PI_left_n_approx m n) <= PI.
+Proof.
+  apply Rle_trans with (r2 := 4 * (PI_left_n n)).
+  { apply Rmult_le_compat_l; [lra|].
+    apply PI_left_n_approx_left. }
+  { apply PI_left_bound. }
+Qed.
+
+Goal 314/100 <= PI.
+Proof.
+  Local Opaque PI Rmult Rinv Rplus Rle.
+  generalize (PI_left_approx_bound 1000%nat 1000%nat); intro X.
+  unfold PI_left_n_approx in X. simpl in X.
+
+
+
+Ltac pi_cal H :=
+  unfold Q.of_z, PI_left_n, PI_right_n, sum_f_R0, PI_tg_left, PI_tg_right in H;
+  Q.compute H;
+  pi_finish H.
+
+
+Ltac pi_finish H :=
+  repeat Q.mult_reduce_once H;
+  Q.finish H.
+
+Ltac pi_cal H :=
+  unfold Q.of_z, PI_left_n, PI_right_n, sum_f_R0, PI_tg_left, PI_tg_right in H;
+  Q.compute H;
+  pi_finish H.
+
+Ltac pi_left_bound n H :=
+  let X := fresh H in
+  generalize (PI_left_bound n); intro X;
+  pi_cal X.
+
+Ltac pi_right_bound n H :=
+  let X := fresh H in
+  generalize (PI_right_bound n); intro X;
+  pi_cal X.
+
+Ltac pi_bound n H :=
+  let X := fresh H in
+  generalize (PI_bound n); intro X;
+  pi_cal X.
+
+
+
+
+      Rle
+
+
+
+Definition PI_tg_left_approx (m: nat) (n: nat) :=
+  (Q.mk m (Q.approx_left (2 * (2 * n) + 1) 1 m))
+  +
+  (Q.mk m (Q.approx_left (2 * (2 * n + 1) + 1) (-1) m))
+.
+
+Lemma
+
+Definition PI_left_n (n: nat) :=
+  sum_f_R0 PI_tg_left n.
+
+
+  Lemma approx_left_left p q n
+    :
+      mk n (approx_left p q n) <= mk p q.
+
+
+Lemma PI_tg_left_eq n
+  :
+    PI_tg_left n = PI_tg_left' n.
+Proof.
+  unfold PI_tg_left', PI_tg_left.
+  repeat rewrite INR_IZR_INZ.
+  repeat rewrite Q.unfold.
+  rewrite <- Rplus_opp. f_equal.
+  { replace (Z.of_nat (2 * (2 * n) + 1 - 1) + 1)%Z with (Z.of_nat (2 * (2 * n) + 1))%Z;
+      [simpl; lra|lia]. }
+  { replace (Z.of_nat (2 * (2 * n + 1) + 1 - 1) + 1)%Z with (Z.of_nat (2 * (2 * n + 1) + 1))%Z;
+      [simpl; lra|lia]. }
+Qed.
+
+Lemma PI_tg_left_pos n
+  :
+    PI_tg_left n >= 0.
+Proof.
+  rewrite PI_tg_left_eq.
+  unfold PI_tg_left. apply Rge_minus.
+  apply Rle_ge. apply Rinv_le_contravar.
+  { eapply Rlt_le_trans with (r2 := INR 1).
+    { simpl. lra. }
+    { apply le_INR. lia. }
+  }
+  { apply le_INR. lia. }
+Qed.
+
+Definition PI_left_n (n: nat) :=
+  sum_f_R0 PI_tg_left n.
+
+Lemma PI_left_incr n m
+      (LE: (n <= m)%nat)
+  :
+    PI_left_n n <= PI_left_n m.
+Proof.
+  induction LE.
+  { lra. }
+  { unfold PI_left_n in *. simpl.
+    eapply Rle_trans with (r2 := sum_f_R0 PI_tg_left m); auto.
+    set (PI_tg_left_pos (S m)). lra.
+  }
+Qed.
+
+Lemma PI_left_n_odd (n: nat)
+  :
+    PI_left_n n = sum_f_R0 (tg_alt PI_tg) (2 * n + 1).
+Proof.
+  induction n.
+  { unfold PI_left_n. simpl. rewrite PI_tg_left_eq. compute. lra. }
+  unfold PI_left_n in *. simpl. rewrite IHn.
+  replace (n + S (n + 0) + 1)%nat with (S (2 * n + 1))%nat; [|lia]. simpl.
+  rewrite Rplus_assoc. f_equal.
+  rewrite PI_tg_left_eq. unfold PI_tg_left', tg_alt, PI_tg.
+  replace ((-1) ^ S (n + (n + 0) + 1)) with 1; cycle 1.
+  { replace (S (n + (n + 0) + 1))%nat with (2 * (n + 1))%nat; [|lia]. simpl.
+    symmetry. apply pow_1_even. }
+  replace ((-1) ^ S (S (n + (n + 0) + 1))) with (- 1); cycle 1.
+  { replace (S (S (n + (n + 0) + 1))) with (S (2 * (n + 1))); [|lia].
+    symmetry. apply pow_1_odd. }
+  rewrite Rmult_1_l. rewrite Rmult_opp_1. rewrite Rplus_opp. f_equal.
+  { f_equal. f_equal. lia. }
+  { f_equal. f_equal. lia. }
+Qed.
+
+Theorem PI_left_bound n
+  :
+    4 * (PI_left_n n) <= PI.
+Proof.
+  rewrite <- Alt_PI_eq. unfold Alt_PI.
+  rewrite (@Rmult_comm 4 (let (a, _) := exist_PI in a)).
+  rewrite (@Rmult_comm 4 (PI_left_n n)).
+  apply Rmult_le_compat_r; [lra|].
+  eapply Un_cv_inf.
+  { apply (proj2_sig exist_PI). }
+  { instantiate (1:=(2 * n + 1)%nat). intros. simpl.
+    assert (((exists m, n <= m /\ n0 = 2 * m + 1) \/
+             (exists m, n <= m /\ n0 = S (2 * m + 1)))%nat).
+    { induction LE.
+      { left. exists n. eauto. }
+      destruct IHLE.
+      { destruct H as [n0 [LE0 IHLE]]. subst. right.
+        exists n0. split; eauto. }
+      { destruct H as [n0 [LE0 IHLE]]. subst. left.
+        exists (S n0). split; eauto. lia. }
+    }
+    clear LE. destruct H as [[m [LE EQ]]|[m [LE EQ]]]; subst.
+    { rewrite <- PI_left_n_odd. apply PI_left_incr; auto. }
+    { simpl. replace (m + (m + 0) + 1)%nat with (2 * m + 1)%nat; [|lia].
+      rewrite <- PI_left_n_odd.
+      eapply Rle_trans with (r2 := PI_left_n m).
+      { apply PI_left_incr; auto. }
+      { assert (0 <= tg_alt PI_tg (S (2 * m + 1))); [|lra].
+        unfold tg_alt. left. eapply Rmult_lt_0_compat.
+        { replace (S (2 * m + 1))%nat with (2 * (m + 1))%nat; [|lia].
+          rewrite pow_1_even. lra. }
+        { unfold PI_tg. apply Rinv_0_lt_compat.
+          eapply Rlt_le_trans with (r2 := INR 1).
+          { simpl. lra. }
+          { apply le_INR. lia. }
+        }
+      }
+    }
+  }
+Qed.
+
+
+Theorem PI_bound (n: nat)
+  :
+    (Q.IQR (Q.of_z 4)) * (PI_left_n n) <= PI /\ PI <= (Q.IQR (Q.of_z 4)) * (PI_right_n n).
+Proof.
+  split.
+  - apply PI_left_bound.
+  - apply PI_right_bound.
+Qed.
+
+
+Ltac pi_finish H :=
+  repeat Q.mult_reduce_once H;
+  Q.finish H.
+
+Ltac pi_cal H :=
+  unfold Q.of_z, PI_left_n, PI_right_n, sum_f_R0, PI_tg_left, PI_tg_right in H;
+  Q.compute H;
+  pi_finish H.
+
+Ltac pi_left_bound n H :=
+  let X := fresh H in
+  generalize (PI_left_bound n); intro X;
+  pi_cal X.
+
+Ltac pi_right_bound n H :=
+  let X := fresh H in
+  generalize (PI_right_bound n); intro X;
+  pi_cal X.
+
+Ltac pi_bound n H :=
+  let X := fresh H in
+  generalize (PI_bound n); intro X;
+  pi_cal X.
+
+
+(* example *)
+Goal (313 / 100) <= PI /\ PI <=  (315 / 100).
+Proof.
+  Local Opaque PI Rmult Rinv Rplus Rle.
+  pi_bound 60%nat BOUND.
+(* BOUND : PI <= *)
+(*           817355897460758433210137074374063341628134447875394412585350896763571468106224803898403068182172248626252 / *)
+(*           259500915196959702932940250743531893523878307222822022067284824631768074202098371130970906447320220451625 *)
+  lra.
+Qed.
+
+(* final goal *)
+Goal PI <= (512321475000 / 162998802113).
+Proof.
+  (* Local Opaque PI Rmult Rinv Rplus Rle. *)
+  (* pi_right_bound 300%nat BOUND. => PI <= 3.14325... *)
+Abort.
+
+
+Module Q.
+
+  Definition mk (divisor: nat) (dividend: Z): R :=
+    IZR dividend / IZR (Z.of_nat (divisor - 1) + 1).
+
+  Lemma unfold p q
+    :
+      mk p q = IZR q / IZR (Z.of_nat (p - 1) + 1).
+  Proof. auto. Qed.
+  Global Opaque mk.
+
+  Definition approx_left (p: nat) (q: Z) (n: nat): Z :=
+    (((Z.of_nat (n - 1) + 1) * q) / (Z.of_nat (p - 1) + 1)).
+
+  Definition approx_right (p: nat) (q: Z) (n: nat): Z :=
+    Z.succ (((Z.of_nat (n - 1) + 1) * q) / (Z.of_nat (p - 1) + 1)).
+
+  Lemma IZR_pos n
+    :
+      0 < IZR (Z.of_nat n + 1).
+  Proof.
+    eapply Rlt_le_trans with (r2 := IZR 1); [lra|].
+    apply IZR_le. lia.
+  Qed.
+
+  Lemma approx_left_left p q n
+    :
+      mk n (approx_left p q n) <= mk p q.
+  Proof.
+    set (LT0:= IZR_pos (n - 1)).
+    set (LT1:= IZR_pos (p - 1)).
+    repeat rewrite unfold.
+    apply (Rmult_le_reg_r (IZR (Z.of_nat (n - 1) + 1))); auto.
+    unfold Rdiv at 1. rewrite Rmult_assoc.
+    rewrite Rinv_l; [|lra]. rewrite Rmult_1_r.
+    unfold Rdiv. rewrite Rmult_assoc. rewrite Rmult_comm.
+    apply (Rmult_le_reg_l (IZR (Z.of_nat (p - 1) + 1))); auto.
+    repeat rewrite <- Rmult_assoc.
+    rewrite Rinv_r; [|lra]. rewrite Rmult_1_l.
+    repeat rewrite <- mult_IZR. apply IZR_le.
+    apply Zdiv.Z_mult_div_ge. lia.
+  Qed.
+
+  Lemma approx_right_right p q n
+    :
+      mk p q <= mk n (approx_right p q n).
+  Proof.
+    set (LT0:= IZR_pos (n - 1)).
+    set (LT1:= IZR_pos (p - 1)).
+    repeat rewrite unfold.
+    apply (Rmult_le_reg_r (IZR (Z.of_nat (p - 1) + 1))); auto.
+    unfold Rdiv at 1. rewrite Rmult_assoc.
+    rewrite Rinv_l; [|lra]. rewrite Rmult_1_r.
+    unfold Rdiv. rewrite Rmult_assoc. rewrite Rmult_comm.
+    apply (Rmult_le_reg_l (IZR (Z.of_nat (n - 1) + 1))); auto.
+    repeat rewrite <- Rmult_assoc.
+    rewrite Rinv_r; [|lra]. rewrite Rmult_1_l.
+    repeat rewrite <- mult_IZR. apply IZR_le.
+    apply Z.lt_le_incl. apply Z.mul_succ_div_gt. lia.
+  Qed.
+
+  Lemma plus_same x y n
+    :
+      mk n x + mk n y = mk n (x + y)
+  .
+  Proof.
+    repeat rewrite unfold.
+    rewrite (plus_IZR x y). lra.
+  Qed.
+
+End Q.
+
+
+  mk n (((Z.of_nat n + 1) * (dividend x)) / (Z.of_nat (divisor x) + 1)).
+
+  Definition approx_right (x: t) (n: nat): t :=
+    mk n (Z.succ (((Z.of_nat n + 1) * (dividend x)) / (Z.of_nat (divisor x) + 1))).
 
 
   Record t: Set :=
