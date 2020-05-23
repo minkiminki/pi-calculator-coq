@@ -93,6 +93,11 @@ Module Q.
         x2.(divisor) * x1.(dividend))%Z
   .
 
+  Definition mult (x1 x2: t): t :=
+    mk (x1.(divisor) * x2.(divisor))%Z
+       (x1.(dividend) * x2.(dividend))%Z
+  .
+
   Definition reduce (x: t): t :=
     let d := Z.gcd x.(divisor) x.(dividend) in
     mk (Z.div x.(divisor) d)
@@ -138,6 +143,21 @@ Module Q.
     }
   Qed.
 
+  Lemma mult_commute x1 x2
+        (NEQ1: x1.(divisor) <> 0%Z)
+        (NEQ2: x2.(divisor) <> 0%Z)
+    :
+      IQR x1 * IQR x2 =
+      IQR (mult x1 x2).
+  Proof.
+    assert (RNEQ1: IZR (divisor x1) <> 0).
+    { intros EQ. apply NEQ1, eq_IZR, EQ. }
+    assert (RNEQ2: IZR (divisor x2) <> 0).
+    { intros EQ. apply NEQ2, eq_IZR, EQ. }
+    unfold mult. repeat rewrite IQR_unfold. simpl.
+    repeat rewrite mult_IZR. unfold Rdiv.
+    rewrite Rinv_mult_distr; auto. lra.
+  Qed.
 
   Lemma reduce_commute x
         (NEQ: x.(divisor) <> 0%Z)
@@ -183,26 +203,52 @@ Module Q.
     destruct EQ; exfalso; eauto.
   Qed.
 
+  Lemma mult_reduce_commute x1 x2
+        (NEQ1: x1.(divisor) <> 0%Z)
+        (NEQ2: x2.(divisor) <> 0%Z)
+    :
+      IQR x1 * IQR x2 =
+      IQR (reduce (mult x1 x2)).
+  Proof.
+    rewrite mult_commute; auto.
+    apply reduce_commute; auto.
+    simpl. intros EQ. apply Zmult_integral in EQ.
+    destruct EQ; exfalso; eauto.
+  Qed.
+
+  Definition of_z (n: Z): t := Q.mk 1 n.
+  Lemma of_z_IZR n
+    :
+      Q.IQR (of_z n) = IZR n.
+  Proof.
+    unfold of_z. rewrite Q.IQR_unfold. simpl. lra.
+  Qed.
+
   Ltac nonzerotac :=
     let H := fresh in
     intros H; inversion H.
 
-  Ltac compute_once H :=
-    (try (rewrite plus_commute in H; [compute in H|nonzerotac|nonzerotac])).
+  Ltac plus_once H :=
+    rewrite plus_commute in H; [compute in H|nonzerotac|nonzerotac].
 
-  Ltac compute_reduce_once H :=
-    (try (rewrite plus_reduce_commute in H; [compute in H|nonzerotac|nonzerotac])).
+  Ltac plus_reduce_once H :=
+    rewrite plus_reduce_commute in H; [compute in H|nonzerotac|nonzerotac].
+
+  Ltac mult_once H :=
+    rewrite mult_commute in H; [compute in H|nonzerotac|nonzerotac].
+
+  Ltac mult_reduce_once H :=
+    rewrite mult_reduce_commute in H; [compute in H|nonzerotac|nonzerotac].
 
   Ltac reduce H :=
-    (try rewrite reduce_commute in H; [|nonzerotac]).
-
-  Ltac compute_without_reduce H :=
-    repeat (compute_once H);
-    try (reduce H); compute in H.
+    rewrite reduce_commute in H; [|nonzerotac].
 
   Ltac compute H :=
-    repeat (compute_reduce_once H);
+    repeat (plus_reduce_once H);
     try (reduce H); compute in H.
+
+  Ltac finish H :=
+    repeat rewrite IQR_unfold in H; simpl in H.
 
 End Q.
 
@@ -284,9 +330,10 @@ Qed.
 
 Theorem PI_left_bound n
   :
-    4 * (PI_left_n n) <= PI.
+    (Q.IQR (Q.of_z 4)) * (PI_left_n n) <= PI.
 Proof.
   rewrite <- Alt_PI_eq. unfold Alt_PI.
+  rewrite Q.of_z_IZR.
   rewrite (@Rmult_comm 4 (let (a, _) := exist_PI in a)).
   rewrite (@Rmult_comm 4 (PI_left_n n)).
   apply Rmult_le_compat_r; [lra|].
@@ -401,10 +448,12 @@ Qed.
 
 Theorem PI_right_bound n
   :
-    PI <= 4 * (PI_right_n n).
+    PI <= (Q.IQR (Q.of_z 4)) * (PI_right_n n).
 Proof.
   rewrite <- Alt_PI_eq. unfold Alt_PI.
+  rewrite Q.of_z_IZR.
   rewrite (@Rmult_comm 4 (let (a, _) := exist_PI in a)).
+  simpl.
   rewrite (@Rmult_comm 4 (PI_right_n n)).
   apply Rmult_le_compat_r; [lra|].
   apply Rge_le. eapply Un_cv_sup.
@@ -441,79 +490,49 @@ Proof.
 Qed.
 
 
-Definition four: R := 4.
-Lemma four_4
-  :
-    four = 4.
-Proof. auto. Qed.
-Local Opaque four.
-
 Theorem PI_bound (n: nat)
   :
-    four * (PI_left_n n) <= PI /\ PI <= four * (PI_right_n n).
+    (Q.IQR (Q.of_z 4)) * (PI_left_n n) <= PI /\ PI <= (Q.IQR (Q.of_z 4)) * (PI_right_n n).
 Proof.
   split.
   - apply PI_left_bound.
   - apply PI_right_bound.
 Qed.
 
-Ltac simplify H :=
-  repeat rewrite Q.IQR_unfold in H;
-  repeat rewrite four_4 in H;
-  simpl in H.
+
+Ltac pi_finish H :=
+  repeat Q.mult_reduce_once H;
+  Q.finish H.
+
+Ltac pi_cal H :=
+  unfold Q.of_z, PI_left_n, PI_right_n, sum_f_R0, PI_tg_left, PI_tg_right in H;
+  Q.compute H;
+  pi_finish H.
 
 Ltac pi_left_bound n H :=
   let X := fresh H in
   generalize (PI_left_bound n); intro X;
-  unfold PI_left_n, PI_right_n, sum_f_R0, PI_tg_left, PI_tg_right in X;
-  Q.compute X; simplify X.
+  pi_cal X.
 
 Ltac pi_right_bound n H :=
   let X := fresh H in
   generalize (PI_right_bound n); intro X;
-  unfold PI_left_n, PI_right_n, sum_f_R0, PI_tg_left, PI_tg_right in X;
-  Q.compute X; simplify X.
+  pi_cal X.
 
 Ltac pi_bound n H :=
   let X := fresh H in
   generalize (PI_bound n); intro X;
-  unfold PI_left_n, PI_right_n, sum_f_R0, PI_tg_left, PI_tg_right in X;
-  Q.compute X; simplify X.
+  pi_cal X.
 
 (* example *)
-Goal (8 / 3) <= PI /\ PI <=  (52 / 15).
+Goal PI <=  (315 / 100).
 Proof.
   Local Opaque PI Rmult Rinv Rplus Rle.
-  pi_right_bound 60%nat H.
-Admitted.
-
-(* (* example *) *)
-(* Goal (304 / 105) <= PI /\ PI <=  (1052 / 315). *)
-(* Proof. *)
-(*   Local Opaque PI. *)
-(*   generalize (PI_bound 1). *)
-(*   unfold PI_left_n, PI_right_n, sum_f_R0, PI_tg_left, PI_tg_right. simpl. *)
-(*   lra. *)
-(* Qed. *)
-
-(* (* example *) *)
-(* Goal (10312 / 3465) <= PI /\ PI <=  (147916 / 45045). *)
-(* Proof. *)
-(*   Local Opaque PI. *)
-(*   generalize (PI_bound 2). *)
-(*   unfold PI_left_n, PI_right_n, sum_f_R0, PI_tg_left, PI_tg_right. simpl. *)
-(*   lra. *)
-(* Qed. *)
-
-(* (* example *) *)
-(* Goal (10312 / 3465) <= PI /\ PI <=  (147916 / 45045). *)
-(* Proof. *)
-(*   Local Opaque PI. *)
-(*   generalize (PI_bound 2). *)
-(*   unfold PI_left_n, PI_right_n, sum_f_R0, PI_tg_left, PI_tg_right. simpl. *)
-(*   lra. *)
-(* Qed. *)
-
+  pi_right_bound 60%nat BOUND.
+  (* we will get *)
+  (*    (PI <= 817355897460758433210137074374063341628134447875394412585350896763571468106224803898403068182172248626252 / 259500915196959702932940250743531893523878307222822022067284824631768074202098371130970906447320220451625) *)
+  lra.
+Qed.
 
 (* example *)
 Goal PI <= (512321475000 / 162998802113).
