@@ -321,22 +321,14 @@ Proof.
 Qed.
 
 (* example *)
-Goal (10312 / 3465) <= PI /\ PI <=  (147916 / 45045).
+Goal PI <=  (3150 / 1000).
 Proof.
   Local Opaque PI.
-  generalize (PI_bound 2).
+  generalize (PI_bound 60).
   unfold PI_left_n, PI_right_n, sum_f_R0, PI_tg_left, PI_tg_right. simpl.
   lra.
 Qed.
 
-
-
-(* Definition QtoR (p q: nat): R := (INR p / INR q). *)
-
-
-(* Lemma *)
-
-(* Lemma pi_cal *)
 
 
 (* example *)
