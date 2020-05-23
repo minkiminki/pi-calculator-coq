@@ -70,41 +70,44 @@ Qed.
 
 Module Q.
 
-  Definition mk (divisor: nat) (dividend: Z): R :=
-    IZR dividend / IZR (Z.of_nat (divisor - 1) + 1).
+  Definition mk (divisor: Z) (dividend: Z): R :=
+    IZR dividend / IZR divisor.
 
   Lemma unfold p q
     :
-      mk p q = IZR q / IZR (Z.of_nat (p - 1) + 1).
+      mk p q = IZR q / IZR p.
   Proof. auto. Qed.
   Global Opaque mk.
 
-  Definition approx_left (p: nat) (q: Z) (n: nat): Z :=
-    (((Z.of_nat (n - 1) + 1) * q) / (Z.of_nat (p - 1) + 1)).
+  Definition approx_left (p q n: Z): Z :=
+    ((n * q) / p).
 
-  Definition approx_right (p: nat) (q: Z) (n: nat): Z :=
-    Z.succ (((Z.of_nat (n - 1) + 1) * q) / (Z.of_nat (p - 1) + 1)).
+  Definition approx_right (p q n: Z): Z :=
+    Z.succ ((n * q) / p).
 
   Lemma IZR_pos n
+        (LE: (1 <= n)%Z)
     :
-      0 < IZR (Z.of_nat n + 1).
+      0 < IZR n.
   Proof.
     eapply Rlt_le_trans with (r2 := IZR 1); [lra|].
     apply IZR_le. lia.
   Qed.
 
   Lemma approx_left_left p q n
+        (LE0: (1 <= p)%Z)
+        (LE1: (1 <= n)%Z)
     :
       mk n (approx_left p q n) <= mk p q.
   Proof.
-    set (LT0:= IZR_pos (n - 1)).
-    set (LT1:= IZR_pos (p - 1)).
+    set (RLE0:= IZR_pos _ LE0).
+    set (RLE1:= IZR_pos _ LE1).
     repeat rewrite unfold.
-    apply (Rmult_le_reg_r (IZR (Z.of_nat (n - 1) + 1))); auto.
+    apply (Rmult_le_reg_r (IZR n)); auto.
     unfold Rdiv at 1. rewrite Rmult_assoc.
     rewrite Rinv_l; [|lra]. rewrite Rmult_1_r.
     unfold Rdiv. rewrite Rmult_assoc. rewrite Rmult_comm.
-    apply (Rmult_le_reg_l (IZR (Z.of_nat (p - 1) + 1))); auto.
+    apply (Rmult_le_reg_l (IZR p)); auto.
     repeat rewrite <- Rmult_assoc.
     rewrite Rinv_r; [|lra]. rewrite Rmult_1_l.
     repeat rewrite <- mult_IZR. apply IZR_le.
@@ -112,17 +115,19 @@ Module Q.
   Qed.
 
   Lemma approx_right_right p q n
+        (LE0: (1 <= p)%Z)
+        (LE1: (1 <= n)%Z)
     :
       mk p q <= mk n (approx_right p q n).
   Proof.
-    set (LT0:= IZR_pos (n - 1)).
-    set (LT1:= IZR_pos (p - 1)).
+    set (RLE0:= IZR_pos _ LE0).
+    set (RLE1:= IZR_pos _ LE1).
     repeat rewrite unfold.
-    apply (Rmult_le_reg_r (IZR (Z.of_nat (p - 1) + 1))); auto.
+    apply (Rmult_le_reg_r (IZR p)); auto.
     unfold Rdiv at 1. rewrite Rmult_assoc.
     rewrite Rinv_l; [|lra]. rewrite Rmult_1_r.
     unfold Rdiv. rewrite Rmult_assoc. rewrite Rmult_comm.
-    apply (Rmult_le_reg_l (IZR (Z.of_nat (n - 1) + 1))); auto.
+    apply (Rmult_le_reg_l (IZR n)); auto.
     repeat rewrite <- Rmult_assoc.
     rewrite Rinv_r; [|lra]. rewrite Rmult_1_l.
     repeat rewrite <- mult_IZR. apply IZR_le.
@@ -138,12 +143,6 @@ Module Q.
     rewrite (plus_IZR x y). lra.
   Qed.
 
-  Ltac plus_once H :=
-    rewrite plus_same_commute in H.
-
-  Ltac compute H :=
-    repeat (plus_once H).
-
 End Q.
 
 
@@ -153,9 +152,9 @@ Definition PI_tg_left' (n: nat) :=
   ((/ INR (2 * (2 * n) + 1)) - (/ INR (2 * (2 * n + 1) + 1))).
 
 Definition PI_tg_left (n: nat) :=
-  (Q.mk (2 * (2 * n) + 1) 1)
+  (Q.mk (2 * (2 * (Z.of_nat n)) + 1) 1)
   +
-  (Q.mk (2 * (2 * n + 1) + 1) (-1))
+  (Q.mk (2 * (2 * (Z.of_nat n) + 1) + 1) (-1))
 .
 
 Lemma PI_tg_left_eq n
@@ -166,9 +165,9 @@ Proof.
   repeat rewrite INR_IZR_INZ.
   repeat rewrite Q.unfold.
   rewrite <- Rplus_opp. f_equal.
-  { replace (Z.of_nat (2 * (2 * n) + 1 - 1) + 1)%Z with (Z.of_nat (2 * (2 * n) + 1))%Z;
+  { replace (2 * (2 * Z.of_nat n) + 1)%Z with (Z.of_nat (2 * (2 * n) + 1))%Z;
       [simpl; lra|lia]. }
-  { replace (Z.of_nat (2 * (2 * n + 1) + 1 - 1) + 1)%Z with (Z.of_nat (2 * (2 * n + 1) + 1))%Z;
+  { replace (2 * (2 * Z.of_nat n + 1) + 1)%Z with (Z.of_nat (2 * (2 * n + 1) + 1))%Z;
       [simpl; lra|lia]. }
 Qed.
 
@@ -269,9 +268,9 @@ Definition PI_tg_right' (n: nat) :=
   (- (/ INR (2 * (2 * n + 1) + 1)) + (/ INR (2 * (2 * n + 2) + 1))).
 
 Definition PI_tg_right (n: nat) :=
-  (Q.mk (2 * (2 * n + 2) + 1) 1)
+  (Q.mk (2 * (2 * (Z.of_nat n) + 2) + 1) 1)
   +
-  (Q.mk (2 * (2 * n + 1) + 1) (-1)).
+  (Q.mk (2 * (2 * (Z.of_nat n) + 1) + 1) (-1)).
 
 Lemma PI_tg_right_eq n
   :
@@ -280,9 +279,9 @@ Proof.
   unfold PI_tg_right', PI_tg_right.
   repeat rewrite INR_IZR_INZ.
   repeat rewrite Q.unfold. rewrite Rplus_comm. f_equal.
-  { replace (Z.of_nat (2 * (2 * n + 1) + 1 - 1) + 1)%Z with (Z.of_nat (2 * (2 * n + 1) + 1))%Z;
+  { replace (2 * (2 * Z.of_nat n + 1) + 1)%Z with (Z.of_nat (2 * (2 * n + 1) + 1))%Z;
       [simpl; lra|lia]. }
-  { replace (Z.of_nat (2 * (2 * n + 2) + 1 - 1) + 1)%Z with (Z.of_nat (2 * (2 * n + 2) + 1))%Z;
+  { replace (2 * (2 * Z.of_nat n + 2) + 1)%Z with (Z.of_nat (2 * (2 * n + 2) + 1))%Z;
       [simpl; lra|lia]. }
 Qed.
 
@@ -382,33 +381,33 @@ Qed.
 
 
 
-Definition PI_tg_left_approx (m: nat) (n: nat) :=
+Definition PI_tg_left_approx (m: Z) (n: Z) :=
   ((Q.approx_left (2 * (2 * n) + 1) 1 m) +
    (Q.approx_left (2 * (2 * n + 1) + 1) (-1) m))%Z
 .
 
 Lemma PI_tg_left_approx_left m n
+      (LE: (1 <= m)%Z)
   :
-    Q.mk m (PI_tg_left_approx m n) <= PI_tg_left n.
+    Q.mk m (PI_tg_left_approx m (Z.of_nat n)) <= PI_tg_left n.
 Proof.
   unfold PI_tg_left_approx, PI_tg_left.
   rewrite <- Q.plus_same_commute. apply Rplus_le_compat.
-  { apply Q.approx_left_left. }
-  { apply Q.approx_left_left. }
+  { apply Q.approx_left_left; auto. lia. }
+  { apply Q.approx_left_left; auto. lia. }
 Qed.
 
-Fixpoint sum_f_Z0 (f: nat -> Z) (n: nat): Z :=
+Fixpoint sum_f_Z0 (f: Z -> Z) (n: nat): Z :=
   match n with
-  | O => f O
-  | S n' => (sum_f_Z0 f n' + f n)%Z
+  | O => f (Z.of_nat O)
+  | S n' => (sum_f_Z0 f n' + f (Z.of_nat n))%Z
   end.
 
-
-Fixpoint sum_f_Z0_tail (f: nat -> Z) (n: nat) (sum: Z): Z :=
+Fixpoint sum_f_Z0_tail (f: Z -> Z) (n: nat) (sum: Z): Z :=
   match n with
-  | O => (sum + f O)%Z
+  | O => (sum + f (Z.of_nat O))%Z
   | S n' =>
-    let fn := f (S n') in
+    let fn := f (Z.of_nat n) in
     let sum' := (sum + fn)%Z in
     sum_f_Z0_tail f n' sum'
   end.
@@ -421,37 +420,55 @@ Proof.
   rewrite <- IHn. lia.
 Qed.
 
-Definition PI_left_n_approx (m: nat) (n: nat) :=
+Definition PI_left_n_approx (m: Z) (n: nat) :=
   Q.mk m (sum_f_Z0_tail (PI_tg_left_approx m) n 0).
 
 Lemma PI_left_n_approx_left m n
+      (LE: (1 <= m)%Z)
   :
     PI_left_n_approx m n <= PI_left_n n.
 Proof.
   unfold PI_left_n_approx, PI_left_n.
   rewrite <- sum_f_Z0_tail_eq. simpl.
   induction n.
-  { simpl. apply PI_tg_left_approx_left. }
+  { simpl. apply (PI_tg_left_approx_left m 0). auto. }
   { simpl. rewrite <- Q.plus_same_commute. apply Rplus_le_compat; auto.
-    apply PI_tg_left_approx_left. }
+    apply (PI_tg_left_approx_left m (S n)); auto. }
 Qed.
 
 Theorem PI_left_approx_bound m n
+      (LE: (1 <= m)%Z)
   :
     4 * (PI_left_n_approx m n) <= PI.
 Proof.
   apply Rle_trans with (r2 := 4 * (PI_left_n n)).
   { apply Rmult_le_compat_l; [lra|].
-    apply PI_left_n_approx_left. }
+    apply PI_left_n_approx_left; auto. }
   { apply PI_left_bound. }
 Qed.
 
 Goal 314/100 <= PI.
 Proof.
   Local Opaque PI Rmult Rinv Rplus Rle.
-  generalize (PI_left_approx_bound 100000%nat 0%nat); intro X.
-  unfold PI_left_n_approx, Z.to_nat, PI_tg_left_approx, Q.approx_left,
-  sum_f_Z0_tail in X.
+  cut (4 * PI_left_n_approx 200000 1000 <= PI); cycle 1.
+  { apply (PI_left_approx_bound 200000 1000). lia. }
+  { intros X.
+
+    unfold PI_left_n_approx, Z.to_nat, PI_tg_left_approx in X.
+
+    simpl in X.
+
+
+    admit. }
+  (* cut  *)
+
+  (* (1 <= 100000)%Z *)
+  generalize (PI_left_approx_bound 100000 0%nat); intro X.
+
+
+  unfold PI_left_n_approx, Z.to_nat, PI_tg_left_approx in X.
+
+
   Local Opaque Init.Nat.of_uint. simpl in X.
   Local Transparent Init.Nat.of_uint.
 
