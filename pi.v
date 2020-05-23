@@ -70,22 +70,188 @@ Qed.
 
 Module Q.
 
+  (* Definition mk (divisor: nat) (dividend: Z): R := *)
+  (*   IZR dividend / IZR (Z.of_nat (divisor - 1) + 1). *)
+
+  (* Lemma IQR_unfold p q *)
+  (*   : *)
+  (*     mk p q = IZR q / IZR (Z.of_nat (p - 1) + 1). *)
+  (* Proof. auto. Qed. *)
+  (* Global Opaque mk. *)
+
+
   Record t: Set :=
     mk
       {
-        divisor: Z;
+        divisor: nat;
         dividend: Z;
       }.
 
   Definition IQR (x: t): R :=
-    IZR (dividend x) / IZR (divisor x).
+    IZR (dividend x) / IZR (Z.of_nat (divisor x) + 1).
 
   Lemma IQR_unfold x
     :
-      IQR x = IZR x.(dividend) / IZR x.(divisor).
+      IQR x = IZR (dividend x) / IZR (Z.of_nat (divisor x) + 1).
   Proof. auto. Qed.
-
   Global Opaque IQR.
+
+  Definition approx_left (x: t) (n: nat): t :=
+    mk n (((Z.of_nat n + 1) * (dividend x)) / (Z.of_nat (divisor x) + 1)).
+
+  Definition approx_right (x: t) (n: nat): t :=
+    mk n (Z.succ (((Z.of_nat n + 1) * (dividend x)) / (Z.of_nat (divisor x) + 1))).
+
+  Lemma IZR_pos n
+    :
+      0 < IZR (Z.of_nat n + 1).
+  Proof.
+    eapply Rlt_le_trans with (r2 := IZR 1); [lra|].
+    apply IZR_le. lia.
+  Qed.
+
+  Lemma approx_left_left x n
+    :
+      IQR (approx_left x n) <= IQR x.
+  Proof.
+    set (LT0:= IZR_pos n).
+    set (LT1:= IZR_pos (divisor x)).
+    repeat rewrite IQR_unfold. simpl.
+    apply (Rmult_le_reg_r (IZR (Z.of_nat n + 1))); auto.
+    unfold Rdiv at 1. rewrite Rmult_assoc.
+    rewrite Rinv_l; [|lra]. rewrite Rmult_1_r.
+    unfold Rdiv. rewrite Rmult_assoc. rewrite Rmult_comm.
+    apply (Rmult_le_reg_l (IZR (Z.of_nat (divisor x) + 1))); auto.
+    repeat rewrite <- Rmult_assoc.
+    rewrite Rinv_r; [|lra]. rewrite Rmult_1_l.
+    repeat rewrite <- mult_IZR. apply IZR_le.
+    apply Zdiv.Z_mult_div_ge. lia.
+  Qed.
+
+  Lemma approx_right_right x n
+    :
+       IQR x <= IQR (approx_right x n).
+  Proof.
+    set (LT0:= IZR_pos n).
+    set (LT1:= IZR_pos (divisor x)).
+    repeat rewrite IQR_unfold. simpl.
+    apply (Rmult_le_reg_r (IZR (Z.of_nat (divisor x) + 1))); auto.
+    unfold Rdiv at 1. rewrite Rmult_assoc.
+    rewrite Rinv_l; [|lra]. rewrite Rmult_1_r.
+    unfold Rdiv. rewrite Rmult_assoc. rewrite Rmult_comm.
+    apply (Rmult_le_reg_l (IZR (Z.of_nat n + 1))); auto.
+    repeat rewrite <- Rmult_assoc.
+    rewrite Rinv_r; [|lra]. rewrite Rmult_1_l.
+    repeat rewrite <- mult_IZR. apply IZR_le.
+    apply Z.lt_le_incl. apply Z.mul_succ_div_gt. lia.
+  Qed.
+
+  Lemma plus_same x y n
+    :
+      IQR (mk n x) + IQR (mk n y)
+      =
+      IQR (mk n (x + y)).
+  Proof.
+    repeat rewrite IQR_unfold. simpl.
+    rewrite (plus_IZR x y). lra.
+  Qed.
+
+
+  Record t: Set :=
+    mk
+      {
+        divisor: nat;
+        dividend: Z;
+      }.
+
+  Definition IQR (x: t): R :=
+    IZR (dividend x) / IZR (Z.of_nat (divisor x) + 1).
+
+  Lemma IQR_unfold x
+    :
+      IQR x = IZR (dividend x) / IZR (Z.of_nat (divisor x) + 1).
+  Proof. auto. Qed.
+  Global Opaque IQR.
+
+  Definition approx_left (x: t) (n: nat): t :=
+    mk n (((Z.of_nat n + 1) * (dividend x)) / (Z.of_nat (divisor x) + 1)).
+
+  Definition approx_right (x: t) (n: nat): t :=
+    mk n (Z.succ (((Z.of_nat n + 1) * (dividend x)) / (Z.of_nat (divisor x) + 1))).
+
+  Lemma IZR_pos n
+    :
+      0 < IZR (Z.of_nat n + 1).
+  Proof.
+    eapply Rlt_le_trans with (r2 := IZR 1); [lra|].
+    apply IZR_le. lia.
+  Qed.
+
+  Lemma approx_left_left x n
+    :
+      IQR (approx_left x n) <= IQR x.
+  Proof.
+    set (LT0:= IZR_pos n).
+    set (LT1:= IZR_pos (divisor x)).
+    repeat rewrite IQR_unfold. simpl.
+    apply (Rmult_le_reg_r (IZR (Z.of_nat n + 1))); auto.
+    unfold Rdiv at 1. rewrite Rmult_assoc.
+    rewrite Rinv_l; [|lra]. rewrite Rmult_1_r.
+    unfold Rdiv. rewrite Rmult_assoc. rewrite Rmult_comm.
+    apply (Rmult_le_reg_l (IZR (Z.of_nat (divisor x) + 1))); auto.
+    repeat rewrite <- Rmult_assoc.
+    rewrite Rinv_r; [|lra]. rewrite Rmult_1_l.
+    repeat rewrite <- mult_IZR. apply IZR_le.
+    apply Zdiv.Z_mult_div_ge. lia.
+  Qed.
+
+  Lemma approx_right_right x n
+    :
+       IQR x <= IQR (approx_right x n).
+  Proof.
+    set (LT0:= IZR_pos n).
+    set (LT1:= IZR_pos (divisor x)).
+    repeat rewrite IQR_unfold. simpl.
+    apply (Rmult_le_reg_r (IZR (Z.of_nat (divisor x) + 1))); auto.
+    unfold Rdiv at 1. rewrite Rmult_assoc.
+    rewrite Rinv_l; [|lra]. rewrite Rmult_1_r.
+    unfold Rdiv. rewrite Rmult_assoc. rewrite Rmult_comm.
+    apply (Rmult_le_reg_l (IZR (Z.of_nat n + 1))); auto.
+    repeat rewrite <- Rmult_assoc.
+    rewrite Rinv_r; [|lra]. rewrite Rmult_1_l.
+    repeat rewrite <- mult_IZR. apply IZR_le.
+    apply Z.lt_le_incl. apply Z.mul_succ_div_gt. lia.
+  Qed.
+
+  Lemma plus_same x y n
+    :
+      IQR (mk n x) + IQR (mk n y)
+      =
+      IQR (mk n (x + y)).
+  Proof.
+    repeat rewrite IQR_unfold. simpl.
+    rewrite (plus_IZR x y). lra.
+  Qed.
+
+
+
+       IQR x <= IQR (approx_right x n).
+  Proof.
+    set (LT0:= IZR_pos n).
+    set (LT1:= IZR_pos (divisor x)).
+    repeat rewrite IQR_unfold. simpl.
+    apply (Rmult_le_reg_r (IZR (Z.of_nat (divisor x) + 1))); auto.
+    unfold Rdiv at 1. rewrite Rmult_assoc.
+    rewrite Rinv_l; [|lra]. rewrite Rmult_1_r.
+    unfold Rdiv. rewrite Rmult_assoc. rewrite Rmult_comm.
+    apply (Rmult_le_reg_l (IZR (Z.of_nat n + 1))); auto.
+    repeat rewrite <- Rmult_assoc.
+    rewrite Rinv_r; [|lra]. rewrite Rmult_1_l.
+    repeat rewrite <- mult_IZR. apply IZR_le.
+    apply Z.lt_le_incl. apply Z.mul_succ_div_gt. lia.
+  Qed.
+
+
 
   Definition plus (x1 x2: t): t :=
     mk (x1.(divisor) * x2.(divisor))%Z
