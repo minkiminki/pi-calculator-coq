@@ -358,23 +358,30 @@ Definition PI_tg_left' (n: nat) :=
   ((/ INR (2 * (2 * n) + 1)) - (/ INR (2 * (2 * n + 1) + 1))).
 
 Definition PI_tg_left (n: nat) :=
-  (Q.IQR (Q.mk (2 * (2 * Z.of_nat n) + 1) 1))
-  +
-  (Q.IQR (Q.mk (2 * (2 * Z.of_nat n + 1) + 1) (-1)))
-.
+  let z := Z.of_nat n in
+  (Q.IQR (Q.mk ((4 * z + 1) * (4 * z + 3)) 2)).
 
 Lemma PI_tg_left_eq n
   :
     PI_tg_left n = PI_tg_left' n.
 Proof.
+  Local Opaque Z.mul.
   unfold PI_tg_left', PI_tg_left.
-  repeat rewrite INR_IZR_INZ.
-  repeat rewrite Q.IQR_unfold.
-  rewrite <- Rplus_opp. f_equal.
-  { replace (2 * (2 * Z.of_nat n) + 1)%Z with (Z.of_nat (2 * (2 * n) + 1))%Z;
-      [simpl; lra|lia]. }
-  { replace (2 * (2 * Z.of_nat n + 1) + 1)%Z with (Z.of_nat (2 * (2 * n + 1) + 1))%Z;
-      [simpl; lra|lia]. }
+  transitivity ((Q.IQR (Q.mk (2 * (2 * Z.of_nat n) + 1) 1))
+                +
+                (Q.IQR (Q.mk (2 * (2 * Z.of_nat n + 1) + 1) (-1)))).
+  { rewrite Q.plus_commute; simpl; try lia.
+    unfold Q.plus. simpl. f_equal. f_equal; try lia.
+  }
+  { repeat rewrite INR_IZR_INZ.
+    repeat rewrite Q.IQR_unfold.
+    rewrite <- Rplus_opp. f_equal.
+    { replace (2 * (2 * Z.of_nat n) + 1)%Z with (Z.of_nat (2 * (2 * n) + 1))%Z;
+        [simpl; lra|lia]. }
+    { replace (2 * (2 * Z.of_nat n + 1) + 1)%Z with (Z.of_nat (2 * (2 * n + 1) + 1))%Z;
+        [simpl; lra|lia]. }
+  }
+  Local Transparent Z.mul.
 Qed.
 
 Lemma PI_tg_left_pos n
@@ -476,22 +483,29 @@ Definition PI_tg_right' (n: nat) :=
   (- (/ INR (2 * (2 * n + 1) + 1)) + (/ INR (2 * (2 * n + 2) + 1))).
 
 Definition PI_tg_right (n: nat) :=
-  (Q.IQR (Q.mk (2 * (2 * Z.of_nat n + 2) + 1) 1))
-  +
-  (Q.IQR (Q.mk (2 * (2 * Z.of_nat n + 1) + 1) (-1)))
+  let z := Z.of_nat n in
+  Q.IQR (Q.mk ((4 * z + 5) * (4 * z + 3)) (-2))
 .
 
 Lemma PI_tg_right_eq n
   :
     PI_tg_right n = PI_tg_right' n.
 Proof.
+  Local Opaque Z.mul.
   unfold PI_tg_right', PI_tg_right.
+  transitivity ((Q.IQR (Q.mk (2 * (2 * Z.of_nat n + 2) + 1) 1))
+                +
+                (Q.IQR (Q.mk (2 * (2 * Z.of_nat n + 1) + 1) (-1)))).
+  { rewrite Q.plus_commute; simpl; try lia.
+    unfold Q.plus. simpl. f_equal. f_equal; try lia.
+  }
   repeat rewrite INR_IZR_INZ.
   repeat rewrite Q.IQR_unfold. rewrite Rplus_comm. f_equal.
   { replace (2 * (2 * Z.of_nat n + 1) + 1)%Z with (Z.of_nat (2 * (2 * n + 1) + 1))%Z;
       [simpl; lra|lia]. }
   { replace (2 * (2 * Z.of_nat n + 2) + 1)%Z with (Z.of_nat (2 * (2 * n + 2) + 1))%Z;
       [simpl; lra|lia]. }
+  Local Transparent Z.mul.
 Qed.
 
 Lemma PI_tg_right_neg n
@@ -606,7 +620,7 @@ Ltac pi_finish H :=
 
 Ltac pi_cal H :=
   unfold Q.of_z, PI_left_n, PI_right_n, sum_f_R0, PI_tg_left, PI_tg_right in H;
-  Q.compute H;
+  Q.compute_opt H;
   pi_finish H.
 
 Ltac pi_left_bound n H :=
@@ -625,20 +639,46 @@ Ltac pi_bound n H :=
   pi_cal X.
 
 
+
+Lemma fraction_compare (a b c d: Z)
+      (POS0: (0 < b)%Z)
+      (POS1: (0 < d)%Z)
+      (LE: (a * d <= b *c)%Z)
+  :
+    IZR a / IZR b <= IZR c / IZR d.
+Proof.
+  assert (RPOS0: 0 < IZR b).
+  { eapply Rlt_le_trans with (r2 := IZR 1); [lra|].
+    apply IZR_le. lia. }
+  assert (RPOS1: 0 < IZR d).
+  { eapply Rlt_le_trans with (r2 := IZR 1); [lra|].
+    apply IZR_le. lia. }
+  apply Rmult_le_reg_r with (r := IZR b); auto.
+  unfold Rdiv at 1. rewrite Rmult_assoc.
+  rewrite Rinv_l; [|lra]. rewrite Rmult_1_r.
+  rewrite Rmult_comm. unfold Rdiv.
+  apply Rmult_le_reg_r with (r := IZR d); auto.
+  repeat rewrite Rmult_assoc.
+  rewrite Rinv_l; [|lra]. rewrite Rmult_1_r.
+  repeat rewrite <- mult_IZR. apply IZR_le. auto.
+Qed.
+
+
+
+
 (* example *)
 Goal (313 / 100) <= PI /\ PI <=  (315 / 100).
 Proof.
   Local Opaque PI Rmult Rinv Rplus Rle.
-  pi_bound 60%nat BOUND.
-(* BOUND : PI <= *)
-(*           817355897460758433210137074374063341628134447875394412585350896763571468106224803898403068182172248626252 / *)
-(*           259500915196959702932940250743531893523878307222822022067284824631768074202098371130970906447320220451625 *)
-  lra.
+  pi_bound 60%nat BOUND. lra.
 Qed.
 
 (* final goal *)
 Goal PI <= (512321475000 / 162998802113).
 Proof.
-  (* Local Opaque PI Rmult Rinv Rplus Rle. *)
-  (* pi_right_bound 300%nat BOUND. => PI <= 3.14325... *)
-Abort.
+  Local Opaque PI Rmult Rinv Rplus Rle.
+  (* it takes more than 5 min  *)
+  pi_right_bound 340%nat BOUND.
+  lra.
+  (* and Qed takes much more... *)
+Qed.
