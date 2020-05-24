@@ -93,16 +93,92 @@ Module Q.
         x2.(divisor) * x1.(dividend))%Z
   .
 
+  Definition plus_opt (x1 x2: t): t :=
+    let g := Z.gcd x1.(divisor) x2.(divisor) in
+    mk ((x1.(divisor) / g) * x2.(divisor))%Z
+       ((x1.(divisor) / g) * x2.(dividend) +
+        (x2.(divisor) / g) * x1.(dividend))%Z
+  .
+
   Definition mult (x1 x2: t): t :=
     mk (x1.(divisor) * x2.(divisor))%Z
        (x1.(dividend) * x2.(dividend))%Z
   .
 
+  Definition reduce_rev (x: t) (n: Z): t :=
+    mk (x.(divisor) * n)
+       (x.(dividend) * n).
+
+  Lemma Z_divide_mult (p q: Z)
+        (DIV: (p | q)%Z)
+        (NEQ: p <> 0%Z)
+    :
+      q = ((q / p) * p)%Z.
+  Proof.
+    destruct DIV as [d EQ]. subst.
+    rewrite Z.div_mul; auto.
+  Qed.
+
+  Lemma Z_divide_gcd_nzero p q
+        (NEQ: p <> 0%Z)
+    :
+      (p / Z.gcd p q <> 0)%Z.
+  Proof.
+    assert (NEQGCD: Z.gcd p q <> 0%Z).
+    { intros EQ. apply Z.gcd_eq_0 in EQ. destruct EQ. exfalso. eauto. }
+    generalize (Z.gcd_divide_l p q). intros DIV.
+    destruct DIV as [g EQ]. rewrite EQ at 1.
+    rewrite Zdiv.Z_div_mult_full; auto.
+    intros GEQ. subst. lia.
+  Qed.
+
+  Lemma reduce_rev_eq x n
+        (NEQ0: x.(divisor) <> 0%Z)
+        (NEQ1: n <> 0%Z)
+    :
+      IQR x =
+      IQR (reduce_rev x n).
+  Proof.
+    assert (RNEQ0: IZR (divisor x) <> 0).
+    { intros EQ. apply NEQ0, eq_IZR, EQ. }
+    assert (RNEQ1: IZR (divisor x * n) <> 0).
+    { intros EQ. apply eq_IZR_R0 in EQ.
+      apply Zmult_integral in EQ.
+      destruct EQ; exfalso; eauto. }
+    unfold reduce_rev. repeat rewrite IQR_unfold. simpl.
+    apply (Rmult_eq_reg_r (IZR (divisor x))); auto.
+    unfold Rdiv at 1. rewrite Rmult_assoc. rewrite Rinv_l; auto.
+    rewrite Rmult_1_r. rewrite Rmult_comm. unfold Rdiv at 1.
+    apply (Rmult_eq_reg_r (IZR (divisor x * n))); auto.
+    repeat rewrite Rmult_assoc. rewrite Rinv_l; auto.
+    rewrite Rmult_1_r. repeat rewrite <- mult_IZR.
+    f_equal. lia.
+  Qed.
+
   Definition reduce (x: t): t :=
-    let d := Z.gcd x.(divisor) x.(dividend) in
-    mk (Z.div x.(divisor) d)
-       (Z.div x.(dividend) d)
+    let g := Z.gcd x.(divisor) x.(dividend) in
+    mk (Z.div x.(divisor) g)
+       (Z.div x.(dividend) g)
   .
+
+  Lemma reduce_eq x
+        (NEQ: x.(divisor) <> 0%Z)
+    :
+      IQR x =
+      IQR (reduce x).
+  Proof.
+    assert (NEQGCD: Z.gcd (divisor x) (dividend x) <> 0%Z).
+    { intros EQ. apply Z.gcd_eq_0 in EQ. destruct EQ. exfalso. eauto. }
+    set (NEQDIV:= Z_divide_gcd_nzero (divisor x) (dividend x)).
+    transitivity (IQR (reduce_rev (reduce x) (Z.gcd (divisor x) (dividend x)))).
+    { unfold reduce. repeat rewrite IQR_unfold. simpl. f_equal.
+      { f_equal. apply Z_divide_mult; auto.
+        apply Z.gcd_divide_r. }
+      { f_equal. apply Z_divide_mult; auto.
+        apply Z.gcd_divide_l. }
+    }
+    { symmetry. apply reduce_rev_eq; auto. }
+  Qed.
 
   Lemma plus_commute x1 x2
         (NEQ1: x1.(divisor) <> 0%Z)
@@ -143,6 +219,41 @@ Module Q.
     }
   Qed.
 
+  Lemma plus_opt_commute x1 x2
+        (NEQ1: x1.(divisor) <> 0%Z)
+        (NEQ2: x2.(divisor) <> 0%Z)
+    :
+      IQR x1 + IQR x2 =
+      IQR (plus_opt x1 x2).
+  Proof.
+    assert (NEQGCD: Z.gcd (divisor x1) (divisor x2) <> 0%Z).
+    { intros EQ. apply Z.gcd_eq_0 in EQ. destruct EQ. exfalso. eauto. }
+    set (NEQDIV:= Z_divide_gcd_nzero (divisor x1) (divisor x2)).
+    rewrite plus_commute; auto.
+    transitivity (IQR (reduce_rev (plus_opt x1 x2) (Z.gcd (divisor x1) (divisor x2)))).
+    { unfold plus, plus_opt, reduce_rev. simpl. f_equal. f_equal.
+      { rewrite <- Zmult_assoc.
+        rewrite (Zmult_comm (divisor x2) (Z.gcd (divisor x1) (divisor x2))).
+        rewrite (Z_divide_mult (Z.gcd (divisor x1) (divisor x2)) (divisor x1)) at 1; auto.
+        { lia. }
+        { apply Z.gcd_divide_l. }
+      }
+      { rewrite Z.mul_add_distr_r. f_equal.
+        { rewrite (Z_divide_mult (Z.gcd (divisor x1) (divisor x2)) (divisor x1)) at 1; auto.
+          { lia. }
+          { apply Z.gcd_divide_l. }
+        }
+        { rewrite (Z_divide_mult (Z.gcd (divisor x1) (divisor x2)) (divisor x2)) at 1; auto.
+          { lia. }
+          { apply Z.gcd_divide_r. }
+        }
+      }
+    }
+    { symmetry. apply reduce_rev_eq; auto.
+      unfold plus_opt. simpl.
+      apply Z.neq_mul_0. split; auto. }
+  Qed.
+
   Lemma mult_commute x1 x2
         (NEQ1: x1.(divisor) <> 0%Z)
         (NEQ2: x2.(divisor) <> 0%Z)
@@ -159,37 +270,6 @@ Module Q.
     rewrite Rinv_mult_distr; auto. lra.
   Qed.
 
-  Lemma reduce_commute x
-        (NEQ: x.(divisor) <> 0%Z)
-    :
-      IQR x =
-      IQR (reduce x).
-  Proof.
-    assert (RNEQ: IZR (divisor x) <> 0).
-    { intros EQ. apply NEQ, eq_IZR, EQ. }
-    unfold reduce. repeat rewrite IQR_unfold. simpl.
-    assert (NEQGCD: Z.gcd (divisor x) (dividend x) <> 0%Z).
-    { intros EQ. apply Z.gcd_eq_0 in EQ. destruct EQ. exfalso. eauto. }
-    generalize (Z.gcd_divide_r (divisor x) (dividend x)). intros DIV1.
-    generalize (Z.gcd_divide_l (divisor x) (dividend x)). intros DIV2.
-    destruct DIV1 as [p DIV1].
-    destruct DIV2 as [q DIV2].
-    assert (NEQQ: q <> 0%Z).
-    { intros EQ. subst. lia. }
-    assert (RNEQQ: IZR q <> 0).
-    { intros EQ. apply NEQQ, eq_IZR, EQ. }
-    rewrite DIV1 at 2. rewrite DIV2 at 4.
-    rewrite Zdiv.Z_div_mult_full; auto.
-    rewrite Zdiv.Z_div_mult_full; auto.
-    apply (Rmult_eq_reg_r (IZR (divisor x))); auto.
-    unfold Rdiv at 1. rewrite Rmult_assoc. rewrite Rinv_l; auto.
-    rewrite Rmult_1_r. rewrite Rmult_comm. unfold Rdiv at 1.
-    apply (Rmult_eq_reg_r (IZR q)); auto.
-    repeat rewrite Rmult_assoc. rewrite Rinv_l; auto.
-    rewrite Rmult_1_r. repeat rewrite <- mult_IZR. f_equal.
-    rewrite DIV1. rewrite DIV2 at 2. lia.
-  Qed.
-
   Lemma plus_reduce_commute x1 x2
         (NEQ1: x1.(divisor) <> 0%Z)
         (NEQ2: x2.(divisor) <> 0%Z)
@@ -198,9 +278,22 @@ Module Q.
       IQR (reduce (plus x1 x2)).
   Proof.
     rewrite plus_commute; auto.
-    apply reduce_commute; auto.
+    apply reduce_eq; auto.
     simpl. intros EQ. apply Zmult_integral in EQ.
     destruct EQ; exfalso; eauto.
+  Qed.
+
+  Lemma plus_opt_reduce_commute x1 x2
+        (NEQ1: x1.(divisor) <> 0%Z)
+        (NEQ2: x2.(divisor) <> 0%Z)
+    :
+      IQR x1 + IQR x2 =
+      IQR (reduce (plus_opt x1 x2)).
+  Proof.
+    rewrite plus_opt_commute; auto.
+    apply reduce_eq; auto.
+    simpl. apply Z.neq_mul_0. split; auto.
+    apply Z_divide_gcd_nzero; auto.
   Qed.
 
   Lemma mult_reduce_commute x1 x2
@@ -211,7 +304,7 @@ Module Q.
       IQR (reduce (mult x1 x2)).
   Proof.
     rewrite mult_commute; auto.
-    apply reduce_commute; auto.
+    apply reduce_eq; auto.
     simpl. intros EQ. apply Zmult_integral in EQ.
     destruct EQ; exfalso; eauto.
   Qed.
@@ -234,6 +327,9 @@ Module Q.
   Ltac plus_reduce_once H :=
     rewrite plus_reduce_commute in H; [compute in H|nonzerotac|nonzerotac].
 
+  Ltac plus_opt_once H :=
+    rewrite plus_opt_reduce_commute in H; [compute in H|nonzerotac|nonzerotac].
+
   Ltac mult_once H :=
     rewrite mult_commute in H; [compute in H|nonzerotac|nonzerotac].
 
@@ -241,10 +337,14 @@ Module Q.
     rewrite mult_reduce_commute in H; [compute in H|nonzerotac|nonzerotac].
 
   Ltac reduce H :=
-    rewrite reduce_commute in H; [|nonzerotac].
+    rewrite reduce_eq in H; [|nonzerotac].
 
   Ltac compute H :=
     repeat (plus_reduce_once H);
+    try (reduce H); compute in H.
+
+  Ltac compute_opt H :=
+    repeat (plus_opt_once H);
     try (reduce H); compute in H.
 
   Ltac finish H :=
